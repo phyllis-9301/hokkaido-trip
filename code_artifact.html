@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>北海道冬日聖誕之旅 - 手機互動旅行手冊</title>
+  
+  <!-- iOS / Android Web App 支援 (加入主畫面體驗如同原生 App) -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1e3a8a" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Standalone (瀏覽器即時解析 JSX) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    @keyframes snowFall {
+      0% { transform: translateY(-10px) translateX(0); opacity: 0.85; }
+      100% { transform: translateY(100vh) translateX(15px); opacity: 0.05; }
+    }
+    .animate-snow-particle {
+      animation: snowFall linear infinite;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* iOS 安全區域邊距 */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 16px);
+    }
+  </style>
+</head>
+<body class="bg-slate-900 flex justify-center min-h-screen text-slate-800 antialiased selection:bg-blue-300">
+
+  <!-- React 根掛載節點 -->
+  <div id="root" class="w-full"></div>
+
+  <!-- React 應用邏輯 -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- 高效能內嵌 SVG 圖示集 (免除外部 icon 套件載入失敗問題) ---
+    const IconBase = ({ d, className = "w-4 h-4", strokeWidth = 2 }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth={strokeWidth} viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">
+        {d}
+      </svg>
+    );
+
+    const PlaneIcon = (props) => <IconBase {...props} d={<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.3c.4-.2.6-.6.5-1.1z"/>} />;
+    const CarIcon = (props) => <IconBase {...props} d={<><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></>} />;
+    const BaggageIcon = (props) => <IconBase {...props} d={<><path d="M6 20h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2z"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M10 12h4"/></>} />;
+    const UtensilsIcon = (props) => <IconBase {...props} d={<><path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2"/><path d="M15 2v16"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></>} />;
+    const CameraIcon = (props) => <IconBase {...props} d={<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>} />;
+    const LandmarkIcon = (props) => <IconBase {...props} d={<><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></>} />;
+    const TrainIcon = (props) => <IconBase {...props} d={<><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><circle cx="8" cy="15" r="1"/><circle cx="16" cy="15" r="1"/></>} />;
+    const ShoppingBagIcon = (props) => <IconBase {...props} d={<><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></>} />;
+    const SparklesIcon = (props) => <IconBase {...props} d={<><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></>} />;
+    const SnowflakeIcon = (props) => <IconBase {...props} d={<><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></>} />;
+    const BusIcon = (props) => <IconBase {...props} d={<><path d="M8 6v6"/><path d="M16 6v6"/><rect width="16" height="16" x="4" y="3" rx="2"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></>} />;
+    const TreesIcon = (props) => <IconBase {...props} d={<><path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6"/><path d="M13 19v3"/><path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-4 4.3a1 1 0 0 0 .8 1.7H10l-3 3.3a1 1 0 0 0 .7 1.7H10l-3 3.3a1 1 0 0 0 .7 1.7Z"/></>} />;
+    const WavesIcon = (props) => <IconBase {...props} d={<><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></>} />;
+    const ClockIcon = (props) => <IconBase {...props} d={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />;
+    const MailIcon = (props) => <IconBase {...props} d={<><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></>} />;
+    const ScaleIcon = (props) => <IconBase {...props} d={<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></>} />;
+    const CheckCircleIcon = (props) => <IconBase {...props} d={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />;
+    const CircleIcon = (props) => <IconBase {...props} d={<circle cx="12" cy="12" r="10"/>} />;
+    const ChevronDownIcon = (props) => <IconBase {...props} d={<path d="m6 9 6 6 6-6"/>} />;
+    const ChevronUpIcon = (props) => <IconBase {...props} d={<path d="m18 15-6-6-6 6"/>} />;
+    const AlertCircleIcon = (props) => <IconBase {...props} d={<><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>} />;
+    const MapPinIcon = (props) => <IconBase {...props} d={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />;
+    const ExternalLinkIcon = (props) => <IconBase {...props} d={<><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></>} />;
+
+    // --- 完整行程資料庫 (100% 同步最新定案細節) ---
+    const itineraryData = [
+      {
+        day: 1,
+        date: '12/23 (三)',
+        shortDate: '12/23 三',
+        title: '降落・包車直達與小樽堺町',
+        theme: '小樽 Otaru',
+        events: [
+          {
+            id: 'd1-1',
+            time: '10:55',
+            title: '抵達新千歲機場 (CTS)',
+            icon: PlaneIcon,
+            color: 'text-sky-500',
+            bg: 'bg-sky-50 border-sky-200',
+            logistics: '抓 90 分鐘通關與領取 6 件大行李。',
+            details: []
+          },
+          {
+            id: 'd1-2',
+            time: '12:30',
+            title: '專車接機直達小樽飯店',
+            icon: CarIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: '舒適型 10 人座包車 (已預訂 NT$4,872)',
+            logistics: '💡 司機免費等候 90 分鐘。通關後直奔上車，徹底免去雪地扛行李轉車！',
+            details: [
+              '6 位大人與 6 件大行李空間寬敞，車程約 75 分鐘直達飯店門口。',
+              '目的地：運河の宿 おたる ふる川 (小樽古川旅館)。'
+            ]
+          },
+          {
+            id: 'd1-3',
+            time: '14:00',
+            title: '抵達古川旅館寄放行李',
+            icon: BaggageIcon,
+            color: 'text-slate-600',
+            bg: 'bg-slate-50 border-slate-200',
+            details: ['櫃檯迅速寄放行李，輕裝出發吃午餐！']
+          },
+          {
+            id: 'd1-4',
+            time: '14:30',
+            title: '午餐：自然派拉麵，堺町通逛街攻略',
+            icon: UtensilsIcon,
+            color: 'text-amber-600',
+            bg: 'bg-amber-50 border-amber-200',
+            logistics: '💡 下午不午休首選！來一碗拉麵，不影響 18:30 懷石大餐。',
+            details: [
+              '🍜 午餐：前往「Mahoro」品嚐選用天然食材的濃郁味噌拉麵。',
+              '🎵 小樽音樂盒堂本館欣賞歐式古董鐘與旋律。',
+              '🍰 甜點三巨頭：LeTAO雙層起司、北菓樓夢不思議大泡芙、六花亭蘭姆葡萄夾心。',
+              '🍢 必吃鹹點：かま栄 (Kamaei) 招牌熱騰騰「麵包捲魚板」。',
+              '📮 堺町郵便局 (營業至17:00) 寄出北海道限定明信片。'
+            ],
+            mapLink: 'https://maps.app.goo.gl/msK6Hc3UQW7ca3Bd6'
+          },
+          {
+            id: 'd1-5',
+            time: '16:45',
+            title: '小樽運河藍調夜景散策',
+            icon: CameraIcon,
+            color: 'text-blue-500',
+            bg: 'bg-blue-50 border-blue-200',
+            details: ['回程天色全暗，正好拍下沿岸復古瓦斯燈與倉庫倒影。']
+          },
+          {
+            id: 'd1-6',
+            time: '18:30',
+            title: '晚餐：古川在地懷石料理',
+            icon: UtensilsIcon,
+            color: 'text-rose-500',
+            bg: 'bg-rose-50 border-rose-200',
+            details: ['小樽古川飯店內享用暖心在地旬之味，飯後享受溫泉風呂。']
+          }
+        ]
+      },
+      {
+        day: 2,
+        date: '12/24 (四)',
+        shortDate: '12/24 四',
+        title: '天狗山觀景・三角市場海鮮・花窗藝術與推進札幌',
+        theme: '小樽 ➔ 札幌',
+        events: [
+          {
+            id: 'd2-1',
+            time: '09:00',
+            title: '晨間運河散步與退房',
+            icon: CameraIcon,
+            color: 'text-teal-600',
+            bg: 'bg-teal-50 border-teal-200',
+            details: ['大行李暫寄古川旅館櫃檯，晨拍無人靜謐的雪景運河。']
+          },
+          {
+            id: 'd2-2',
+            time: '09:30',
+            title: '轉場天狗山山頂觀景喝咖啡',
+            icon: CarIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: '叫 2 台計程車 (15分) ➔ 搭乘空中纜車登頂 (4分)',
+            details: [
+              '登頂俯瞰石狩灣蔚藍海岸線與連綿銀白雪山。',
+              '在山頂 TENGUU CAFE 點杯暖心咖啡與甜點，悠閒欣賞無敵雪景。'
+            ]
+          },
+          {
+            id: 'd2-3',
+            time: '12:00',
+            title: '午餐：三角市場海鮮大餐 (惠比壽櫻)',
+            icon: UtensilsIcon,
+            color: 'text-rose-500',
+            bg: 'bg-rose-50 border-rose-200',
+            transport: '搭乘纜車下山後，搭計程車直達小樽車站旁三角市場。',
+            details: [
+              '下山後直奔三角市場品嚐現烤鱈場蟹、新鮮海膽海鮮丼與活扇貝。',
+              '大快朵頤在地頂級海味，補足體力！'
+            ]
+          },
+          {
+            id: 'd2-4',
+            time: '13:30',
+            title: '花窗玻璃美術館 ＆ 拿行李出發',
+            icon: LandmarkIcon,
+            color: 'text-purple-600',
+            bg: 'bg-purple-50 border-purple-200',
+            logistics: '距離古川旅館步行僅 2 分鐘，逛完後回飯店櫃檯提領大行李，直奔小樽車站！',
+            details: [
+              '小樽藝術村：欣賞 19 世紀末英國教堂彩繪花窗，在室內避寒並感受華麗光影。',
+              '參觀完後回古川旅館取行李，搭計程車或步行前往小樽車站。'
+            ]
+          },
+          {
+            id: 'd2-5',
+            time: '14:30',
+            title: 'JR 快速 Airport 號 (小樽➔札幌)',
+            icon: TrainIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: 'JR 快速 Airport 號自由席 (車程約 40 分鐘)',
+            details: ['💡 小樽站為始發站，提早 10-15 分鐘至月台排隊必定全員有座！']
+          },
+          {
+            id: 'd2-6',
+            time: '15:15',
+            title: '抵達飯店：JR INN 札幌北2条',
+            icon: CarIcon,
+            color: 'text-slate-600',
+            bg: 'bg-slate-50 border-slate-200',
+            transport: '札幌車站南口分搭 2 台計程車約 3 分鐘即達。',
+            details: ['辦理 Check-in，行李上樓稍作歇息。']
+          },
+          {
+            id: 'd2-7',
+            time: '16:00',
+            title: 'Uniqlo UTme! 客製送件',
+            icon: ShoppingBagIcon,
+            color: 'text-orange-500',
+            bg: 'bg-orange-50 border-orange-200',
+            logistics: '札幌東急百貨 7 樓 Uniqlo，避開排隊尖峰！',
+            details: ['現場操作平板提交 UTme! 印刷訂單，訂製 Deli 與 Dean 專屬帆布袋。']
+          },
+          {
+            id: 'd2-8',
+            time: '17:00',
+            title: 'Pokémon Center (大丸 8F)',
+            icon: SparklesIcon,
+            color: 'text-amber-500',
+            bg: 'bg-amber-50 border-amber-200',
+            logistics: '直通車站大樓！搭乘大丸專用電梯直達 8 樓！',
+            details: [
+              '朝聖札幌限定「白六尾」與各式雪國主題周邊。',
+              '全程室內逛街，逛完走天橋連通道 3 分鐘直通東急百貨。'
+            ]
+          },
+          {
+            id: 'd2-9',
+            time: '18:30',
+            title: '大通公園聖誕市集',
+            icon: SnowflakeIcon,
+            color: 'text-cyan-500',
+            bg: 'bg-cyan-50 border-cyan-200',
+            details: [
+              '散步至大通公園感受純白聖誕市集浪漫點燈氛圍。',
+              '晚餐享受充滿聖誕特色的市集美食與熱紅酒。'
+            ]
+          }
+        ]
+      },
+      {
+        day: 3,
+        date: '12/25 (五)',
+        shortDate: '12/25 五',
+        title: '旭川動物園・青池・精靈露台一日遊',
+        theme: 'KKday #155327 人氣線',
+        events: [
+          {
+            id: 'd3-1',
+            time: '07:40',
+            title: '集合出發 (雙集合點任選)',
+            icon: BusIcon,
+            color: 'text-purple-600',
+            bg: 'bg-purple-50 border-purple-200',
+            transport: '步行至集合點 ➔ 搭乘 KKday 觀光專車',
+            logistics: '⚠️ 07:40 大通地鐵站 31 號口 / 07:50 札幌站北口公車場。務必提早 10 分鐘！',
+            details: [
+              '從 JR INN 步行至大通 31 號出口僅約 5 分鐘，走到札幌站北口約 8 分鐘。',
+              '出示 KKday APP 訂單憑證核銷上車，專車直達道北免舟車勞頓。'
+            ]
+          },
+          {
+            id: 'd3-2',
+            time: '10:15',
+            title: '旭川動物園 (停留 2 小時)',
+            icon: CameraIcon,
+            color: 'text-blue-500',
+            bg: 'bg-blue-50 border-blue-200',
+            details: [
+              '🐧 冬季重頭戲：近距離觀賞萌度爆表的「國王企鵝雪地散步」！',
+              '走訪北極熊館水下隧道與海豹館圓柱水槽，園內備有熱食販賣部可簡餐補給。'
+            ]
+          },
+          {
+            id: 'd3-3',
+            time: '12:50',
+            title: '美瑛：Ken & Mary 之木 (車覽 10 分)',
+            icon: TreesIcon,
+            color: 'text-emerald-600',
+            bg: 'bg-emerald-50 border-emerald-200',
+            details: ['汽車廣告著名名木，在廣袤無際的白雪平原中傲然挺立。']
+          },
+          {
+            id: 'd3-4',
+            time: '13:10',
+            title: '白須瀑布 (停留 20 分鐘)',
+            icon: WavesIcon,
+            color: 'text-teal-600',
+            bg: 'bg-teal-50 border-teal-200',
+            details: [
+              '地下湧泉自斷崖傾瀉而下，注入 Tiffany 藍的清澈溪谷。',
+              '冬季兩側垂掛著剔透冰柱與霧凇，宛如冰雪奇緣場景。'
+            ]
+          },
+          {
+            id: 'd3-5',
+            time: '13:40',
+            title: '白金青池 (停留 20 分鐘)',
+            icon: SparklesIcon,
+            color: 'text-sky-600',
+            bg: 'bg-sky-50 border-sky-200',
+            details: ['北海道世界級打卡秘境！枯木群倒映在如藍寶石般的雪水池面上。']
+          },
+          {
+            id: 'd3-6',
+            time: '15:00',
+            title: '富良野：森林精靈露台 (停留 30 分)',
+            icon: LandmarkIcon,
+            color: 'text-amber-500',
+            bg: 'bg-amber-50 border-amber-200',
+            logistics: '💡 備案提醒：若遇精靈露台未開放，則改為前往「拓真館」參觀 30 分鐘。',
+            details: ['隱身在覆雪落葉松林間的原木小屋，漫步在點燈木棧道極度治癒。']
+          },
+          {
+            id: 'd3-7',
+            time: '18:20',
+            title: '返回札幌市區解散',
+            icon: ClockIcon,
+            color: 'text-slate-600',
+            bg: 'bg-slate-50 border-slate-200',
+            details: ['18:20 停靠 JR 札幌站北口，18:30 停靠大通站 31 號口，就地下車解散。']
+          },
+          {
+            id: 'd3-8',
+            time: '19:00',
+            title: '晚餐：炭焼ジンギスカン 北の風',
+            icon: UtensilsIcon,
+            color: 'text-orange-600',
+            bg: 'bg-orange-50 border-orange-200',
+            logistics: '下車後前往狸小路商店街四丁目。',
+            details: ['肉質極為細緻軟嫩、完全沒有羊羶味，聖誕夜最佳暖身美食！']
+          }
+        ]
+      },
+      {
+        day: 4,
+        date: '12/26 (六)',
+        shortDate: '12/26 六',
+        title: '神宮參拜・北大・諏訪神社・寶可夢與全蟹宴',
+        theme: '札幌市區精華',
+        events: [
+          {
+            id: 'd4-1',
+            time: '09:30',
+            title: '白色戀人工廠',
+            icon: TrainIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: '地鐵東西線 (大通 ➔ 宮之澤站，15分)',
+            details: ['出站漫步 8 分鐘抵達，10:00 剛好趕上看戶外整點音樂鐘小丑遊行。']
+          },
+          {
+            id: 'd4-2',
+            time: '11:30',
+            title: '北海道神宮祈福參拜',
+            icon: LandmarkIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: '地鐵東西線 (宮之澤 ➔ 圓山公園站，10分)',
+            details: [
+              '穿過雪地鳥居參拜祈求平安，並收藏北海道限定神宮御守。',
+              '順道前往神宮茶屋吃剛出爐熱呼呼的「六花亭判官餅 (烤麻糬)」。'
+            ]
+          },
+          {
+            id: 'd4-3',
+            time: '12:45',
+            title: '午餐：湯咖喱 奥芝商店 站前創成寺',
+            icon: UtensilsIcon,
+            color: 'text-rose-600',
+            bg: 'bg-rose-50 border-rose-200',
+            details: ['招牌甘甜濃郁的大蝦高湯底，配上炙烤在地食蔬，最佳暖身美食！']
+          },
+          {
+            id: 'd4-4',
+            time: '14:00',
+            title: '北海道大學雪景漫步',
+            icon: SnowflakeIcon,
+            color: 'text-blue-600',
+            bg: 'bg-blue-50 border-blue-200',
+            transport: '自札幌站北口漫步前往',
+            details: ['欣賞著名的白雪銀杏並木大道，順道在生協購買原創「札幌農學校」餅乾。']
+          },
+          {
+            id: 'd4-5',
+            time: '14:45',
+            title: '札幌諏訪神社',
+            icon: LandmarkIcon,
+            color: 'text-amber-600',
+            bg: 'bg-amber-50 border-amber-200',
+            logistics: '⛩️ 北大旁搭計程車約 5 分鐘或步行 15 分鐘。',
+            details: [
+              '以每月更換的繽紛「花手水」（浮花水手舍）與浪漫氛圍聞名。',
+              '必收藏超夢幻的「雪之妖精（銀喉長尾山雀）木製御守」與透明蕾絲御守！'
+            ]
+          },
+          {
+            id: 'd4-6',
+            time: '15:30',
+            title: 'Uniqlo 取件與投遞明信片',
+            icon: MailIcon,
+            color: 'text-emerald-500',
+            bg: 'bg-emerald-50 border-emerald-200',
+            logistics: '前往東急百貨 7 樓櫃檯領取客製完成的 UTme! 帆布袋。',
+            details: ['將貼好郵票的明信片投入百貨周邊或路口紅色郵筒，寄送北海道手寫祝福。']
+          },
+          {
+            id: 'd4-7',
+            time: '16:00',
+            title: '狸小路商店街免稅快閃採購',
+            icon: ShoppingBagIcon,
+            color: 'text-orange-500',
+            bg: 'bg-orange-50 border-orange-200',
+            details: [
+              '透過「札幌地下步行空間 (Chi-Ka-Ho)」直通狸小路，免受地面寒風吹襲。',
+              '松本清、唐吉訶德、札幌藥妝集中比價掃貨。'
+            ]
+          },
+          {
+            id: 'd4-8',
+            time: '17:00',
+            title: '晚餐：冰雪之門全蟹宴',
+            icon: UtensilsIcon,
+            color: 'text-rose-500',
+            bg: 'bg-rose-50 border-rose-200',
+            logistics: '🦀 已預訂 17:00 入席，請準時前往！狸小路採購完畢後步行約 5 分鐘抵達。',
+            details: [
+              '晚餐品嚐三大蟹刺身、烤帝王蟹與濃郁蟹肉火鍋。',
+              '餐後遵循札幌在地傳統文化，深夜享用華麗精緻的「締めパフェ (結尾聖代)」！'
+            ]
+          }
+        ]
+      },
+      {
+        day: 5,
+        date: '12/27 (日)',
+        shortDate: '12/27 日',
+        title: 'JR 機場快線返程與最終補給',
+        theme: '再見雪國 ➔ 賦歸台灣',
+        events: [
+          {
+            id: 'd5-1',
+            time: '08:30',
+            title: '飯店集合 Check-out',
+            icon: BaggageIcon,
+            color: 'text-slate-600',
+            bg: 'bg-slate-50 border-slate-200',
+            logistics: '💡 若有未寄出的明信片，貼好郵票可請 JR INN 櫃檯代為寄送。',
+            details: ['最後行李清點與秤重預檢。']
+          },
+          {
+            id: 'd5-2',
+            time: '08:45',
+            title: '計程車至札幌車站',
+            icon: CarIcon,
+            color: 'text-purple-600',
+            bg: 'bg-purple-50 border-purple-200',
+            transport: '門口叫 2 台計程車約 3 分鐘車程，免拖大行李在積雪路上苦走。',
+            details: []
+          },
+          {
+            id: 'd5-3',
+            time: '09:00',
+            title: 'JR 快速 Airport 號至新千歲',
+            icon: TrainIcon,
+            color: 'text-indigo-500',
+            bg: 'bg-indigo-50 border-indigo-200',
+            transport: 'JR 快速 Airport 號 (自由席車程約 37 分鐘)',
+            details: ['進站前先在札幌站內購買經典火車便當，於車上享用。']
+          },
+          {
+            id: 'd5-4',
+            time: '10:00',
+            title: '機場國內線 2F 最終採購與總體檢',
+            icon: ScaleIcon,
+            color: 'text-amber-600',
+            bg: 'bg-amber-50 border-amber-200',
+            details: [
+              '⚖️ 回程行李警示：全團共用額度 65 公斤！請務必先在機場公用磅秤確認。',
+              '最後衝刺：Royce 生巧克力、KINOTOYA 起司塔、北菓樓米菓。'
+            ]
+          },
+          {
+            id: 'd5-5',
+            time: '11:55',
+            title: '航班起飛返抵台灣',
+            icon: PlaneIcon,
+            color: 'text-sky-500',
+            bg: 'bg-sky-50 border-sky-200',
+            details: ['滿載甜蜜戰利品與浪漫雪國回憶平安返家！']
+          }
+        ]
+      }
+    ];
+
+    // --- 飄雪背景特效元件 ---
+    const Snowflakes = () => {
+      return (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-30 z-0">
+          {[...Array(14)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute bg-white rounded-full animate-snow-particle"
+              style={{
+                width: `${(i % 3) * 2 + 3}px`,
+                height: `${(i % 3) * 2 + 3}px`,
+                left: `${(i * 7.3) % 100}%`,
+                top: `-${(i * 5) % 20}%`,
+                animationDuration: `${((i % 4) + 5)}s`,
+                animationDelay: `${(i * 0.4)}s`,
+              }}
+            />
+          ))}
+        </div>
+      );
+    };
+
+    // --- 單一事件卡片元件 (支援觸控展開與打卡狀態保存) ---
+    const MobileEventCard = ({ event }) => {
+      const [isExpanded, setIsExpanded] = useState(false);
+      const [isDone, setIsDone] = useState(() => {
+        return localStorage.getItem(`done_${event.id}`) === 'true';
+      });
+
+      const handleToggleDone = (e) => {
+        e.stopPropagation();
+        const nextState = !isDone;
+        setIsDone(nextState);
+        localStorage.setItem(`done_${event.id}`, String(nextState));
+      };
+
+      const Icon = event.icon;
+
+      return (
+        <div className={`relative pl-7 pb-4 ${isDone ? 'opacity-55' : 'opacity-100'} transition-all duration-200`}>
+          {/* 時間軸導軌 */}
+          <div className="absolute left-2.5 top-3 -bottom-1 w-0.5 bg-blue-100"></div>
+
+          {/* 打卡完成按鈕 */}
+          <button 
+            type="button"
+            aria-label="標記完成"
+            onClick={handleToggleDone}
+            className="absolute left-0 top-2 z-10 p-0.5 rounded-full bg-white active:scale-95 transition-transform"
+          >
+            {isDone ? (
+              <CheckCircleIcon className="w-5 h-5 text-emerald-500 fill-emerald-50" />
+            ) : (
+              <CircleIcon className="w-5 h-5 text-blue-300 hover:text-blue-500 transition-colors" />
+            )}
+          </button>
+
+          {/* 卡片本體 */}
+          <div 
+            className={`bg-white rounded-xl border transition-all ${
+              isDone ? 'border-emerald-200 bg-emerald-50/20' : 'border-slate-100 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.06)]'
+            } overflow-hidden`}
+          >
+            <div 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-3 active:bg-slate-50 transition-colors cursor-pointer select-none"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`p-1.5 rounded-lg shrink-0 border ${event.bg} ${event.color}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black font-mono text-slate-800 tracking-tight">{event.time}</span>
+                      {(event.transport || event.logistics) && !isExpanded && (
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                      )}
+                    </div>
+                    <h3 className={`text-sm font-bold leading-snug mt-0.5 truncate ${isDone ? 'line-through text-slate-400' : 'text-slate-800'}`}>
+                      {event.title}
+                    </h3>
+                  </div>
+                </div>
+                
+                <div className="text-slate-400 shrink-0 p-1">
+                  {isExpanded ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                </div>
+              </div>
+            </div>
+
+            {/* 展開抽屜區塊 */}
+            {isExpanded && (
+              <div className="px-3 pb-3 pt-1 border-t border-slate-100 text-xs text-slate-600 space-y-2 bg-slate-50/50">
+                {event.transport && (
+                  <div className="bg-indigo-50/80 p-2.5 rounded-lg border border-indigo-100/80">
+                    <div className="flex items-center gap-1 font-bold text-indigo-800 mb-0.5">
+                      <TrainIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>交通動線</span>
+                    </div>
+                    <p className="text-slate-700 leading-relaxed pl-4">{event.transport}</p>
+                  </div>
+                )}
+
+                {event.logistics && (
+                  <div className="bg-rose-50/80 p-2.5 rounded-lg border border-rose-100/80">
+                    <div className="flex items-center gap-1 font-bold text-rose-800 mb-0.5">
+                      <AlertCircleIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>重要叮嚀 / 任務</span>
+                    </div>
+                    <p className="text-slate-700 leading-relaxed pl-4">{event.logistics}</p>
+                  </div>
+                )}
+
+                {event.details && event.details.length > 0 && (
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-1.5">
+                    {event.details.map((detail, idx) => (
+                      <div key={idx} className="flex items-start gap-1.5 leading-relaxed">
+                        <span className="text-blue-400 font-bold shrink-0">•</span>
+                        <span className="break-words">{detail}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {event.mapLink && (
+                  <div className="pt-1">
+                    <a 
+                      href={event.mapLink} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 w-full py-2 px-3 text-xs font-bold text-blue-600 bg-blue-50/90 active:bg-blue-100 rounded-lg border border-blue-200"
+                    >
+                      <MapPinIcon className="w-3.5 h-3.5 text-blue-500" />
+                      <span>開啟 Google 地圖路線導航</span>
+                      <ExternalLinkIcon className="w-3 h-3 text-blue-400" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- 主應用程式 ---
+    function App() {
+      const [activeDay, setActiveDay] = useState(1);
+      const currentDayData = itineraryData.find(d => d.day === activeDay) || itineraryData[0];
+
+      return (
+        <div className="min-h-screen bg-slate-100 text-slate-800 font-sans antialiased pb-24 flex justify-center selection:bg-blue-200">
+          <div className="w-full max-w-md bg-slate-50 min-h-screen shadow-2xl flex flex-col relative overflow-x-hidden">
+            
+            {/* 頂部沉浸式雪國 Header */}
+            <header className="relative bg-gradient-to-b from-blue-900 via-sky-800 to-indigo-900 pt-8 pb-4 px-4 text-white text-center shadow-md">
+              <Snowflakes />
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/15 backdrop-blur-md rounded-full text-[11px] font-semibold text-blue-100 border border-white/20 mb-1">
+                  <SnowflakeIcon className="w-3.5 h-3.5 opacity-90" />
+                  <span>HOKKAIDO 2026 TRIP</span>
+                </div>
+                <h1 className="text-xl font-black tracking-tight text-white">北海道 5 天 4 夜</h1>
+                <p className="text-xs text-blue-100 font-medium tracking-wide mt-0.5">聖誕節雪國旅行手冊</p>
+              </div>
+            </header>
+
+            {/* 頂部行李超重防呆橫幅 */}
+            <div className="bg-rose-500 text-white px-3 py-1.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm sticky top-0 z-40">
+              <AlertCircleIcon className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+              <span className="truncate">行李額度：去程 35kg / 回程 65kg</span>
+            </div>
+
+            {/* 主要行程清單區 */}
+            <main className="flex-1 p-3.5">
+              <div className="mb-4 bg-white p-3.5 rounded-2xl border border-blue-50 shadow-sm text-center">
+                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-bold mb-1.5">
+                  <MapPinIcon className="w-3 h-3 text-blue-500" />
+                  <span>{currentDayData.theme}</span>
+                </div>
+                <h2 className="text-base font-extrabold text-slate-800 leading-snug">
+                  {currentDayData.title}
+                </h2>
+              </div>
+
+              <div className="relative">
+                {currentDayData.events.map((event) => (
+                  <MobileEventCard key={event.id} event={event} />
+                ))}
+                <div className="absolute left-2 -bottom-1 w-2 h-2 rounded-full bg-slate-300"></div>
+              </div>
+
+              <div className="mt-6 mb-2 p-3 bg-blue-50/70 border border-blue-100 rounded-xl text-center text-xs text-slate-500 leading-relaxed">
+                ❄️ 戶外嚴寒積雪，請隨身攜帶手套防滑帽。<br/>
+                📱 點擊左側圈圈可打卡，記錄會自動儲存於手機！
+              </div>
+            </main>
+
+            {/* 手機底部懸浮導航列 (支援 iPhone 底部黑條安全區 pb-safe) */}
+            <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
+              <div className="w-full max-w-md bg-white/95 backdrop-blur-md border-t border-slate-200 px-2 pt-2 pb-safe flex items-center justify-around shadow-2xl pointer-events-auto">
+                {itineraryData.map((d) => {
+                  const isActive = activeDay === d.day;
+                  return (
+                    <button
+                      key={d.day}
+                      type="button"
+                      onClick={() => {
+                        setActiveDay(d.day);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all ${
+                        isActive 
+                          ? 'bg-blue-600 text-white font-black shadow-sm scale-105' 
+                          : 'text-slate-500 hover:text-slate-800 active:bg-slate-100 font-medium'
+                      }`}
+                    >
+                      <span className="text-xs">Day {d.day}</span>
+                      <span className={`text-[10px] ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
+                        {d.shortDate.split(' ')[0]}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+
+          </div>
+        </div>
+      );
+    }
+
+    // 渲染至網頁 DOM
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
